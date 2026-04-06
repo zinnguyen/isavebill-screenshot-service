@@ -18,6 +18,20 @@ app.post("/screenshot", async (req, res) => {
     return res.status(400).json({ error: "Missing html" });
   }
 
+  // Inject CSS to control image sizing — broken images stay small,
+  // working images display normally up to full width
+  const cssInjection = `<style>
+    img { max-width: 100%; height: auto; }
+    img:-moz-broken { max-height: 0; opacity: 0; }
+    body { background: #ffffff; margin: 0; padding: 16px; box-sizing: border-box; }
+  </style>`;
+  let processedHtml = html;
+  if (processedHtml.includes('</head>')) {
+    processedHtml = processedHtml.replace('</head>', `${cssInjection}</head>`);
+  } else {
+    processedHtml = cssInjection + processedHtml;
+  }
+
   let browser;
   try {
     browser = await puppeteer.launch({
@@ -33,10 +47,12 @@ app.post("/screenshot", async (req, res) => {
 
     const page = await browser.newPage();
     await page.setViewport({ width: 700, height: 1000 });
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 15000 });
 
-    // Wait 2s for external images like logos to load
-    await new Promise((r) => setTimeout(r, 2000));
+    // Set content and wait for network to settle
+    await page.setContent(processedHtml, { waitUntil: "networkidle0", timeout: 20000 });
+
+    // Wait up to 5s for external images (logos, banners) to load
+    await new Promise((r) => setTimeout(r, 5000));
 
     const screenshot = await page.screenshot({
       type: "jpeg",
