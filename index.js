@@ -18,7 +18,6 @@ app.post("/screenshot", async (req, res) => {
     return res.status(400).json({ error: "Missing html" });
   }
 
-  // Inject CSS to control image sizing and background
   const cssInjection = `<style>
     img { max-width: 100%; height: auto; }
     body { background: #ffffff; margin: 0; padding: 16px; box-sizing: border-box; }
@@ -46,12 +45,20 @@ app.post("/screenshot", async (req, res) => {
     const page = await browser.newPage();
     await page.setViewport({ width: 700, height: 1000 });
 
-    // Use domcontentloaded instead of networkidle0 — faster and more reliable
-    // across all email types including heavy HTML emails with external images
     await page.setContent(processedHtml, { waitUntil: "domcontentloaded", timeout: 20000 });
 
     // Wait 3s for external images to load where possible
     await new Promise((r) => setTimeout(r, 3000));
+
+    // Hide broken images via JavaScript after load
+    await page.evaluate(() => {
+      const imgs = document.querySelectorAll('img');
+      imgs.forEach(img => {
+        if (!img.complete || img.naturalWidth === 0) {
+          img.style.display = 'none';
+        }
+      });
+    });
 
     const screenshot = await page.screenshot({
       type: "jpeg",
