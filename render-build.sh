@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 set -o errexit
 npm install
-if [[ ! -d $PUPPETEER_CACHE_DIR ]]; then
-  echo "...Copying Puppeteer Cache from Build Cache"
-  cp -R /opt/render/project/src/.cache/puppeteer/ $PUPPETEER_CACHE_DIR || true
+
+# Cache Puppeteer Chrome binary between deploys
+export PUPPETEER_CACHE_DIR=/opt/render/project/puppeteer
+
+if [[ -d /opt/render/project/src/.cache/puppeteer ]]; then
+  echo "...Copying Puppeteer Cache from build cache"
+  cp -R /opt/render/project/src/.cache/puppeteer $PUPPETEER_CACHE_DIR || true
 else
-  echo "...Storing Puppeteer Cache in Build Cache"
-  cp -R $PUPPETEER_CACHE_DIR /opt/render/project/src/.cache/puppeteer/ || true
+  echo "...No existing cache found, Puppeteer will download Chrome"
 fi
+
+# Run Puppeteer browser install explicitly to ensure Chrome is present
+npx puppeteer browsers install chrome
